@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<!--
+//*************************************************************************  
+//  Program  : index.html, part of aircoControl
+//  Version  : v0.3.0 (WebSockets)
+//
+//  Copyright (c) 2019 Willem Aandewiel
+//
+//  TERMS OF USE: MIT License. See bottom of file.                                                            
+//*************************************************************************
+-->
+<html charset="UTF-8">
+  <head>
+  <style>
+
+/* define id element selectors (#) ------------------------------------------ */
+#image {
+    position: relative;
+}
+#image img {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+}
+
+/* define class selectors --------------------------------------------------- */
+.blockButton {
+  padding: 5px 10px;
+  margin: 5px;
+  font-size: 15px;
+  text-decoration: none;
+  border-radius: 10px;
+  box-shadow: 2px 2px 15px -5px hsla(0, 0%, 0%, 1);
+}
+.blockButton:hover {
+  background: linear-gradient(to bottom, #f0f9ff 0%,#cbebff 88%,#a1dbff 100%);
+  transition: all 0.2s linear;
+}
+.blockButton .b1 {
+    display: inline-flex; /* element only as wide as content */
+}
+.blockButton .b2 {
+    display: table; /* element only as wide as content */
+}
+
+.tabButton { 
+		width: 130px; 
+		height: 30px;
+		font-size: 14pt;
+		text-align: center;
+		border-radius: 10px 10px 0px 0px;
+		margin: 0px;
+		border-color: black;
+		background: #d6d4d3;
+}
+
+.tabName div {
+  	background-color: lightblue;
+}
+
+.buttonRow {
+		background-color: #ffffff; 
+	  border-color: #ffffff;
+}
+
+.profile {
+		border-style: solid;
+		border-width: 1px;
+}
+
+.profile p {
+    overflow: hidden;
+    background-color: lightblue;
+}
+.profile .label {
+    vertical-align: top;
+    float: left;
+    width: 150px;
+    padding-right: 24px;
+}
+
+.profile .value {
+    vertical-align: top;
+    float: left;
+    width: 140px; 
+/*  width: calc(90% - 150px); */
+}
+
+#logWindow {
+		font-size: 14px;
+		margin-left: 20px;
+		width: 90vw;
+    height: 20vh;
+}
+
+/*
+.dev-header h1 img { 
+  display: inline;
+}
+*/
+
+.header img {
+  float: right;
+  top: 18px;
+  width: 24px;
+  height: 24px;
+/*  background: #555; */
+}
+
+.header h1 span {
+  position: relative;
+  top: 1px;
+  left: 10px;
+}
+
+.footer {
+   position: fixed;
+   left: 0;
+   bottom: 0;
+   width: 100%;
+   color: gray;
+   font-size: small;
+   text-align: right;
+}
+
+/* define tag selectors (.) ------------------------------------------------- */
+
+body {  margin: 10; }
+
+/* End Style ---------------------------------------------------------------- */
+</style>  
+  
+    <meta name="viewport" content="width=device-width, initial-scale=1">	
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.23.0/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+    
+    <title>Airco Controller (v0.3) [WebSockets]</title>
+  </head>
+  <body>
+	<font face="Arial">
+		<!-- <div class="dev-header"> -->
+		<div class="header">
+      <img src="FSexplorer.png" alt="FSexplorer" onclick="window.location = '/FSexplorer'"; return false; />
+    	<h1>
+        <span id="devName">aircoControl</span> &nbsp; &nbsp; &nbsp;
+        <span id="devVersion" style='font-size: small;'>[version]</span>
+      </h1>
+   </div>
+<!--    <div style="clear:both"></div> -->
+  </font>
+
+ 	<!-- START Tabbladen -->
+  <div style="background:#d6d4d3;">
+  	<button id="bControl"  class="tabButton" style="background:#ffffff;" onclick="openTab('Control')">Control</button>
+  	<button id="bGrafiek"  class="tabButton" onclick="openTab('Grafiek')">Grafiek</button>
+  	<button id="bHistorie" class="tabButton" onclick="openTab('Historie')">Historie</button>
+  </div>	<!-- END Tabbladen -->
+
+ 	<!-- START Control Tab -->
+  <div id="Control" class="tabName">
+	 	<!-- START ControlTab Dummy -->
+  	<div id="controlTab" class="dummy">
+		 	<!-- START profile -->
+  		<div class="profile">
+  			<p>
+        	<span class="label">Date/Time</span>
+        	<span id="aircoTime" class="value">00:00</span>
+        </p>
+        <p>
+        	<span class="label">Temp. (intern)</span>
+        	<span id="inTemp1" class="value">0</span>
+        </p>
+        <p>
+        	<span class="label">Temp. (buiten)</span>
+        	<span id="outTemp" class="value">0</span>
+        </p>
+        <p>
+        	<span class="label">upTime</span>
+          <span id="upTime" class="value">00:00:00</span>
+        </p>
+        <p>
+          <span class="label">Airco Status</span>
+          <span id="aircoStatus" class="value">unKnown</span>
+        </p>
+      </div>	<!-- END profile -->
+
+      <div style="background: white;"> 
+      	  <button id="buttonOff"  class="blockButton b1" onclick="handleButton('Off')">Uit</button>
+          <button id="buttonCool" class="blockButton b1" onclick="handleButton('Koelen')">Koelen</button>
+          <button id="buttonHeat" class="blockButton b1" onclick="handleButton('Verwarmen')">Verwarmen</button>
+          <br>
+      </div>
+      
+      <!-- START controlTab setLocked profile -->
+  		<div id="setLocked" class="profile">
+
+  				<span class="label">Airco Cool Treshold</span>
+		  		<span id="aircoCoolTemp" class="value">-</span>
+        <br>
+  				<span class="label">Airco Heat Treshold</span>
+  				<span id="aircoHeatTemp" class="value">-</span>
+        <br>
+  				<span class="label">Number of dataPoints</span>
+  				<span id="aircoDataPoints" class="value">-</span> 
+        <br>
+  				<span class="label">Next Poll</span>
+  				<span id="aircoNextPoll" class="value">-</span>
+        <br>
+  				<span class="label">Next Plot</span>
+  				<span id="aircoNextPlot" class="value">-</span>
+  			<br>
+  		</div>	<!-- END controlTab setLocked profile -->
+    </div>	<!-- END ControlTab Dummy -->
+    
+    <!-- START Unlocked profile -->
+  	<div id="setUnlocked" class="profile" style="display: none;">
+  			
+	  		<span class="label">Airco Cool Treshold</span>
+	  		<input type='number' style='height:25px; font-size:15px;'  min='18' max='50' onchange='fieldChange(event, "setCoolTemp");' 
+		  					id='setCoolTemp' placeholder='setCoolTemp' required value='1' maxlength='3' /> 
+        <br>
+	  		<span class="label">Airco Heat Treshold</span>
+	  		<input type='number' style='height:25px; font-size:15px;'  min='-5' max='20' onchange='fieldChange(event, "setHeatTemp");' 
+		  					id='setHeatTemp' placeholder='setHeatTemp' required value='1' maxlength='3' /> 
+        <br>
+ 				<span class="label">Temp. Dempingsfactor</span>
+	  		<input type='number' style='height:25px; font-size:15px;'  min='0' max='20' onchange='fieldChange(event, "setDemping");' 
+		  					id='setDemping' placeholder='setDemping' required value='1' maxlength='20' /> 
+        <br>
+ 				<span class="label">Firmware Update URL</span>
+	  		<input type='text' style='height:25px; font-size:15px;' onchange='fieldChange(event, "setUpdateURL");' 
+		  					id='setUpdateURL' placeholder='setUpdateURL' size='80' required /> 
+        <br>
+ 				<span class="label">Finger Print</span>
+	  		<input type='text' style='height:25px; font-size:15px;' onchange='fieldChange(event, "setFingerPrint");' 
+		  					id='setFingerPrint' placeholder='setFingerPrint' size='80' required /> 
+        <br>
+ 				<span class="label">Puls Off</span>
+	  		<input type='text' style='height:25px; font-size:15px;' onchange='fieldChange(event, "setPulsOff");' 
+		  					id='setPulsOff' placeholder='setPulsOff' required /> 
+        <br>
+ 				<span class="label">Puls Cool</span>
+	  		<input type='text' style='height:25px; font-size:15px;' onchange='fieldChange(event, "setPulsCool");' 
+		  					id='setPulsCool' placeholder='setPulsCool' required /> 
+        <br>
+ 				<span class="label">Puls Cool Max</span>
+	  		<input type='text' style='height:25px; font-size:15px;' onchange='fieldChange(event, "setPulsCoolMax");' 
+		  					id='setPulsCoolMax' placeholder='setPulsCoolMax' required /> 
+        <br>
+ 				<span class="label">Puls Heat</span>
+	  		<input type='text' style='height:25px; font-size:15px;' onchange='fieldChange(event, "setPulsHeat");' 
+		  					id='setPulsHeat' placeholder='setPulsHeat' required /> 
+        <br>
+ 				<span class="label">Puls Heat Max</span>
+	  		<input type='text' style='height:25px; font-size:15px;' onchange='fieldChange(event, "setPulsHeatMax");' 
+		  					id='setPulsHeatMax' placeholder='setPulsHeatMax' required /> 
+		  	<br>
+		  	</div>
+    </div>	<!-- END Unlocked profile -->
+    
+    <!-- START Settings -->
+    <div id="Settings">	
+	    <label>Settings:</label>&nbsp; &nbsp;
+	    <label>Lock</label>
+	    <input type="radio" name="settings" id="is_Locked" onchange="setLock()" checked/>
+	    &nbsp;&nbsp;
+	    <label>Unlock</label>
+	    <input type="radio" name="settings" id="is_Unlocked" onchange="setLock()"/>
+	  </div> <!-- END Settings -->
+	  
+  </div>	<!-- END Control Tab -->
+
+  <!-- START GrafiekTab -->
+  <div id="Grafiek" class="tabName" style="display:none">
+  	<h2>Temperatuur afgelopen periode</h2>
+  	<canvas id="chartTemp">Grafiek afgelopen periode</canvas> 
+  </div> <!-- END GrafiekTab -->
+
+  <!-- START HistorieTab -->
+  <div id="Historie" class="tabName" style="display:none">
+  	<h2>Historie</h2>
+  	<p>Historie afgelopen periode</p>
+  	<div style="margin-left: 50px; background: white;">
+	  	<table id="histTable" border="1" bgcolor="lightblue">
+  			<tbody>
+  			</tbody>
+  		</table>
+  	</div>
+  </div> <!-- END HistorieTab -->
+  
+  <!-- REST -->
+ 	<p><input type="checkbox" id="debug" value="doDebug" onChange="setDebugMode()"> Debug</p>
+  <div id="Redirect"></div>
+	<textarea id="logWindow"></textarea>
+
+<!-- ======================================================================= -->
+  <script>
+//============================================================================//
+  
+"use strict";
+
+	let webSocketConn;
+  let validJson  			= false;
+  let needReload 			= true;
+  let settingsChanged = false;
+  let jsonMessage;   
+  let singlePair;
+ 	var labels  = [];
+  var tempIn  = [];
+  var tempOut = []; 
+
+  window.onload=bootsTrap;
+  window.onfocus = function() {
+  	if (needReload) {
+  		window.location.reload(true);
+  	}
+  };
+  
+ 	function openTab(tabName) {
+ 		let bID = "b" + tabName;
+    document.getElementById("bControl").style.background='#d6d4d3';
+    document.getElementById("bGrafiek").style.background='#d6d4d3';
+    document.getElementById("bHistorie").style.background='#d6d4d3';
+  	document.getElementById('Settings').style.display = "none";  
+ 		let i;
+ 		let x = document.getElementsByClassName("tabName");
+ 		for (i = 0; i < x.length; i++) {
+ 			x[i].style.display = "none";  
+ 		}
+    document.getElementById(bID).style.background='#ffffff';
+ 		document.getElementById(tabName).style.display = "block";  
+    if (tabName == "Control") {
+ 			addLogLine("newTab: Control");
+    	document.getElementById('Settings').style.display = "block";  
+ 			setLock();
+ 			webSocketConn.send("tabControl");
+ 			settingsChanged = false;
+ 			
+ 		} else if (tabName == "Grafiek") {
+ 			addLogLine("newTab: Grafiek");
+ 			webSocketConn.send("tabGrafiek");
+
+ 		} else if (tabName == "Historie") {
+ 			addLogLine("newTab: Historie");
+ 			webSocketConn.send("tabHistorie");
+ 			updateHistoryTable();
+
+ 		}
+ 	}	// openTab()
+  	
+  
+  function bootsTrap() {
+		addLogLine("bootsTrap()");
+		needReload = true;
+		
+		document.getElementById('logWindow').style.display = "none";
+    
+    let count = 0;
+    while (document.getElementById('devVersion').value == "[version]") {
+    	count++;
+    	addLogLine("count ["+count+"] devVersion is ["+document.getElementById('devVersion').value+"]");
+    	if (count > 10) {
+    		alert("Count="+count+" => reload from server!");
+    		window.location.reload(true);
+    	}
+    	setTimeout("", 500);
+    }
+
+  } // bootsTrap()
+  
+  webSocketConn	= new WebSocket('ws://'+location.host+':81/', ['arduino']);
+  addLogLine(" ");
+  addLogLine("WebSocket('ws://"+location.host+":81/', ['arduino'])");
+  
+  webSocketConn.onopen 		= function () { 
+  	addLogLine("Connected!");
+   	webSocketConn.send('Connect ' + new Date()); 
+   	addLogLine("getDevInfo");
+   	webSocketConn.send("getDevInfo");
+		addLogLine("initTab: Control");
+		webSocketConn.send("tabControl");
+   	needReload	= false;
+
+  }; 
+  webSocketConn.onclose 		= function () { 
+   	addLogLine(" ");
+   	addLogLine("Disconnected!");
+   	addLogLine(" ");
+   	needReload	= true;
+   	openTab('Control')
+   	let redirectButton = "<p></p><hr><p></p><p></p>"; 
+   	redirectButton    += "<style='font-size: 50px;'>Disconneted from aircoController"; 
+   	redirectButton    += "<input type='submit' value='re-Connect' "; 
+    redirectButton    += " onclick='window.location=\"/\";' />  ";     
+   	redirectButton    += "<p></p><p></p><hr><p></p>"; 
+		document.getElementById("controlTab").innerHTML = redirectButton;
+
+  }; 
+  webSocketConn.onerror 	= function (error) 	{ 
+   	addLogLine("Error: " + error);
+   	console.log('WebSocket Error ', error);
+  };
+  webSocketConn.onmessage	= function (e) {
+  //addLogLine("onmessage: " + e.data);
+    parsePayload(e.data); 
+  };
+		
+	function parsePayload(payload) {
+  	validJson = IsJsonString(payload);
+  	if ( payload.startsWith('aircoStatus') ) {											// not json!
+    //addLogLine("parsePayload(Status): received [" + payload + "]");
+  		singlePair   = payload.split(",");
+  		document.getElementById("buttonCool").style.background 		='#ffffff';
+  		document.getElementById("buttonCool").style.fontWeight 		= "400";
+  		document.getElementById("buttonHeat").style.background 		='#ffffff';
+  		document.getElementById("buttonHeat").style.fontWeight 		= "400";
+  		document.getElementById("buttonOff").style.background  		='#ffffff';
+  		document.getElementById("buttonOff").style.fontWeight  		= "400";
+     	if ( singlePair[1] == 1 ) {
+       	document.getElementById('aircoStatus').innerHTML 			 	= "COOL";
+       	document.getElementById("buttonCool").style.background 	= '#4583ff';
+       	document.getElementById("buttonCool").style.fontWeight  = "900";
+      } else if ( singlePair[1] == 2 ) {
+       	document.getElementById('aircoStatus').innerHTML 				= "HEAT";
+       	document.getElementById("buttonHeat").style.background 	= '#42ff35';
+       	document.getElementById("buttonHeat").style.fontWeight 	= "900";
+      } else {
+       	document.getElementById('aircoStatus').innerHTML 				= "OFF";
+       	document.getElementById("buttonOff").style.background  	= 'lightgray';
+       	document.getElementById("buttonOff").style.fontWeight 	= "900";
+      }
+
+  	} else if (    payload.startsWith('inTemp1') 
+  						 ||  payload.startsWith('outTemp') 
+  																											) {					// not json!
+  			addLogLine("parsePayload(temps): received [" + payload + "]");
+  			singlePair   = payload.split(",");
+  			document.getElementById(singlePair[0]).innerHTML = singlePair[1] + "&deg;C";
+
+  	} else if (payload.startsWith('aircoCoolTemp') ) {		     			// not json!
+  			addLogLine("parsePayload(settings): received [" + payload + "]");
+  			singlePair   = payload.split(",");
+  			document.getElementById(singlePair[0]).innerHTML = singlePair[1] + "&deg;C";
+  			document.getElementById('setCoolTemp').value = singlePair[1] * 1;
+
+  	} else if (payload.startsWith('aircoHeatTemp') ) {		     			// not json!
+  			addLogLine("parsePayload(settings): received [" + payload + "]");
+  			singlePair   = payload.split(",");
+  			document.getElementById(singlePair[0]).innerHTML = singlePair[1] + "&deg;C";
+  			document.getElementById('setHeatTemp').value = singlePair[1] * 1;
+
+  	} else if (payload.startsWith('aircoDemping') ) {		     			// not json!
+  			addLogLine("parsePayload(settings): received [" + payload + "]");
+  			singlePair   = payload.split(",");
+  			document.getElementById('setDemping').value = singlePair[1] * 1;
+
+  	} else if (     payload.startsWith('upTime') 
+  							||  payload.startsWith('aircoTime')
+  							||  payload.startsWith('aircoDataPoints') 
+  							||  payload.startsWith('aircoNextPoll') 
+  							||  payload.startsWith('aircoNextPlot') 
+  																											) {					// not json!
+  	  //addLogLine("parsePayload(data): received [" + payload + "]");
+  			singlePair   = payload.split(",");
+  			document.getElementById(singlePair[0]).innerHTML = singlePair[1];
+		
+  	} else if ( payload.startsWith('set') ) {									    	// not json!
+  			addLogLine("parsePayload(Setting): received [" + payload + "]");
+  			singlePair   = payload.split(",");
+  			document.getElementById(singlePair[0].trim()).value = singlePair[1].trim();
+		
+  	} else if ( payload.startsWith('Switch') ) {										// not json!
+  			addLogLine("parsePayload(Switch): received [" + payload + "]");
+  			singlePair   = payload.split(",");
+  			document.getElementById(singlePair[0]).innerHTML = singlePair[1];
+		
+  	} else if (validJson) {
+  		jsonMessage = JSON.parse(payload);
+    //addLogLine("parsePayload(json): [" + jsonMessage.msgType + "]");
+  		console.log("parsePayload(json): [" + jsonMessage.msgType + "]");
+    	if ((jsonMessage.msgType == "devInfo")) {
+      	document.getElementById("devName").innerHTML    = jsonMessage.devName;
+      	document.getElementById("devVersion").innerHTML = jsonMessage.devVersion;
+      	addLogLine("parsePayload(): "+jsonMessage.devIPaddress);
+      	
+      } else if (jsonMessage.msgType == "sendHistTimestamp") {
+      	labels.length 	= 0;
+      	tempIn.length 	= 0;
+      	tempOut.length 	= 0;
+
+ 				let obj = JSON.parse(payload);
+    		for ( var i = 0; i < obj.timestamp.length; i++ ) {
+    			let d = new Date(obj.timestamp[i] * 1000);
+          labels.push( d );
+        };	// for ..
+
+//      	drawChart();
+
+      	
+      } else if (jsonMessage.msgType == "sendHistInTemp") {
+ 				let obj = JSON.parse(payload);
+    		for ( var i = 0; i < obj.inTemp1.length; i++ ) {
+         	tempIn.push( obj.inTemp1[i] );
+        };	// for ..
+
+//      	drawChart();
+
+      } else if (jsonMessage.msgType == "sendHistOutTemp") {
+ 				let obj = JSON.parse(payload);
+    		for ( var i = 0; i < obj.outTemp.length; i++ ) {
+         	tempOut.push( obj.outTemp[i] );
+        };	// for ..
+
+      	drawChart();
+      	updateHistoryTable();
+      }
+  	} else {
+ 			addLogLine("parsePayload(): Don't know: [" + payload + "]\r\n");
+  	}
+  };
+
+  
+  function drawChart() {
+
+        // Get the context of the canvas element we want to select
+        let ctx = document.getElementById("chartTemp").getContext("2d");
+        ctx.canvas.width = 400;
+        ctx.canvas.height = 100;
+                
+        // Instantiate a new chart using 'data' (defined below)
+        let chartTemp = new Chart(ctx, {
+        		type: 'line',
+            data: {
+            	labels: labels,
+            	datasets: [{
+            		label: "Binnen",
+            		data: tempIn,
+            		borderWidth: 2,
+            		//backgroundColor: "rgba(6, 167, 125, 0.1)",
+            		borderColor: "rgba(6, 167, 125, 1)",
+            		//pointBackgroundColor: "rgba(225, 225, 225, 1)",
+            		//pointBorderColor: "rgba(6, 167, 125, 1)",
+            		//pointHoverBackgroundColor: "rgba(6, 167, 125, 1)",
+            		//pointHoverBorderColor: "#fff",
+            		fill: false,
+//          		yAxisID: 'y-1',
+            	}, {
+            		label: "Buiten",
+            		data: tempOut,
+            		borderWidth: 2,
+            		//backgroundColor: "rgba(246, 71, 64, 0.1)",
+            		borderColor: "rgba(246, 71, 64, 1)",
+            		//pointBackgroundColor: "rgba(225, 225, 225, 1)",
+            		//pointBorderColor: "rgba(246, 71, 64, 1)",
+            		//pointHoverBackgroundColor: "rgba(246, 71, 64, 1)",
+            		//pointHoverBorderColor: "#fff",
+            		fill: false,
+//          		yAxisID: 'y-2',
+            	}]
+            },
+            options: {
+            	hoverMode: 'index',
+            	scales: {
+           			xAxes: [{
+           				type: 'time',
+           				time: {
+           					unit: 'hour',
+           					unitStepSize: 2,                					
+           					displayFormats: {
+           						hour: '(DD) HH:mm'
+           					}
+           				}
+//           			}],
+//          		yAxes : [{
+//           			ticks : {
+//           				suggestedMin: 10,
+//           		  	//beginAtZero : false
+//           			}   
+           			}]          
+            	}	// scales ..
+           	}	// options ..
+        });	// charTemp ..
+
+  };// drawChart()
+
+  
+  function updateHistoryTable() {
+    // Find a <table> element with id="histTable":
+    var table = document.getElementById("histTable");
+    
+    while(table.rows.length > 0) {table.deleteRow(0);}
+
+    var headers = ["DataPoint", "Tijd", "Binnen", "Buiten" ];
+
+    var tableHeader = document.createElement("thead");
+    table.appendChild(tableHeader);
+    var tableHeaderRow = document.createElement("tr");
+    table.appendChild(tableHeaderRow);
+    for(i=0;i<headers.length;i++){
+        var tableHeader = document.createElement("th");
+        tableHeaderRow.appendChild(tableHeader);
+        tableHeader.innerHTML = headers[i]
+    }
+
+    for ( var i = 0; i < labels.length; i++ ) {
+    	var ts = new Date(labels[i]);
+    	var M	= ts.getMonth() + 1;
+    	if ( M < 10 ) M = '0' + M;
+    	var d	= ts.getDate();
+    	if ( d < 10 ) d = '0' + d;
+    	var h	= ts.getHours();
+    	if ( h < 10 ) h = '0' + h;
+    	var m	= ts.getMinutes();
+    	if ( m < 10 ) m = '0' + m;
+      // Create an empty <tr> element and add it to the 1st position of the table:
+      var row = table.insertRow(1);
+
+      // Insert new cells (<td> elements) at the 1st and 2nd position of the "new" <tr> element:
+      var cell0 = row.insertCell(0);
+      cell0.style.width = '50px';
+      cell0.style.textAlign = "center";
+      var cell1 = row.insertCell(1);
+      cell1.style.width = '200px';
+      cell1.style.textAlign = "center";
+			var cell2 = row.insertCell(2);
+      cell2.style.width = '120px';
+      cell2.style.textAlign = "right";
+      var cell3 = row.insertCell(3);
+      cell3.style.width = '120px';
+      cell3.style.textAlign = "right";
+      // Add some text to the new cells:
+      cell0.innerHTML = i;
+      cell1.innerHTML = d + "-" + M + " " + h + ":" + m;
+      cell2.innerHTML = round(tempIn[i], 1).toFixed(1) + "&deg;C";
+      cell3.innerHTML = round(tempOut[i], 1).toFixed(1) + "&deg;C";
+    }
+
+  }	// updateHistoryTable()
+  
+  function handleButton(buttonPressed) {
+  	if (buttonPressed == 'Koelen') {
+ 			addLogLine("buttonPressed(Koelen)");
+ 			webSocketConn.send("Button: COOL");
+
+  	} else if (buttonPressed == 'Verwarmen') {
+ 			addLogLine("buttonPressed(Verwarmen)");
+ 			webSocketConn.send("Button: HEAT");
+
+  	} else {
+ 			addLogLine("buttonPressed(Off)");
+ 			webSocketConn.send("Button: OFF");
+
+  	}
+  }	// handleButton()
+      
+  function updateAircoState(json) {
+   	let obj = JSON.parse(json);
+
+    // only if chart panel is active
+   	console.log("updateAircoState : " + JSON.stringify(obj) + "|" + obj.aircoTime);
+   	addLogLine("updateAircoState : " + JSON.stringify(obj) + "|" + obj.aircoTime);
+
+  };	// updateAircoState()
+  
+  function fieldChange(event, fieldName) {
+  	event.cancelBubble = true;
+  	addLogLine("fieldChange(): Field [" + fieldName + "] has changed.");
+  	webSocketConn.send(fieldName + ": " + document.getElementById(fieldName).value);
+  	/**
+  	if (fieldName == "setCoolTemp") {
+  		webSocketConn.send(fieldName + ": " + document.getElementById(fieldName).value);
+  	} else if (fieldName == "setHeatTemp") {
+  		webSocketConn.send(fieldName + ": " + document.getElementById(fieldName).value);
+  	} else if (fieldName == "setDemping") {
+  		webSocketConn.send(fieldName + ": " + document.getElementById(fieldName).value);
+  	}
+  	**/
+  }	// fieldChange()
+
+
+  function setLock() {
+    if (document.getElementById("is_Locked").checked == true) {
+        document.getElementById("is_Locked").value = 1;
+        document.getElementById("is_Unlocked").value = 0;
+        settingsChanged = true;
+    } else {
+        document.getElementById("is_Locked").value = 0;
+        document.getElementById("is_Unlocked").value = 1;
+        settingsChanged = false;
+    }
+    addLogLine("setLock() changed to [" + document.getElementById("is_Locked").value + "]");
+    if (document.getElementById("is_Unlocked").value == '1') {
+    	document.getElementById('setLocked').style.display = "none";  
+    	document.getElementById('setUnlocked').style.display = "block";  
+    } else {
+    	document.getElementById('setLocked').style.display = "block";  
+    	document.getElementById('setUnlocked').style.display = "none";  
+    	if (settingsChanged) {
+    		webSocketConn.send('saveSettings');
+    		settingsChanged = false;
+    	}
+    }
+  }
+  
+  function setDebugMode() {
+  	if (document.getElementById('debug').checked)  {
+  		addLogLine("DebugMode checked!");
+  		document.getElementById('logWindow').style.display = "block";
+  	} else {
+  		addLogLine("DebugMode unchecked");
+  		document.getElementById('logWindow').style.display = "none";
+  	}
+  }	// setDebugMode()
+  
+  function addLogLine(text) {
+  	if (document.getElementById('debug').checked) {
+  		let logWindow = document.getElementById("logWindow");
+  		let myTime = new Date().toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, "$1");
+  		let addText = document.createTextNode("["+myTime+"] "+text+"\r\n");
+  		logWindow.appendChild(addText);
+  		document.getElementById("logWindow").scrollTop = document.getElementById("logWindow").scrollHeight 
+  	} 
+  }	// addLogLine()
+
+  function IsJsonString(str) {
+    try {
+        JSON.parse(str);
+    } catch (e) {
+        return false;
+    }
+    return true;
+  }	// IsJsonString()
+ 
+  function round(value, precision) {
+    var multiplier = Math.pow(10, precision || 0);
+    return Math.round(value * multiplier) / multiplier;
+  }
+
+  </script>
+
+  </body>
+  	<div class="footer">
+      <hr>
+  		2019 &copy; Willem Aandewiel &nbsp; &nbsp;
+  	</div>
+</html>
+
+<!--
+//***************************************************************************
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT
+// OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+// THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+// 
+//***************************************************************************
+-->

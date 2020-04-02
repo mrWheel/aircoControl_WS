@@ -33,8 +33,8 @@
 #define _HOSTNAME     "aircoControl"
 #include "networkStuff.h"
 
-#define _SSID         "AandeWiFi"       // WiFi SSID
-#define _PASSWORD     "3741TS12tl"      // WiFi PASSWORD
+#define _SSID         "yourSSID"         // WiFi SSID
+#define _PASSWORD     "SSIDpasswd"       // WiFi PASSWORD
 #define ONE_WIRE_PIN  2                 // GPIO02 - GPIO pin waar DS18B20 op aangesloten is
 #define IR_LED        4                 // ESP8266 GPIO pin to use. Recommended: 4 (D2).
 #define LEDPIN        5                 // what digital pin we're connected to

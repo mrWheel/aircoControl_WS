@@ -10,10 +10,12 @@ float getOutsideTemp(bool force) {
   int         startPos, endPos;
   int32_t     maxWait;
   
-  WiFiClient client;
+  WiFiClient weerliveClient;
 
   _dThis = true;
   Debugf("getOutsideTemp(%s)\n", host);
+
+  if (settingWeerLiveKey.length() < 5) return 15;
 
   if ((millis() < waitForNext) && !force) {
     _dThis = true;
@@ -23,20 +25,19 @@ float getOutsideTemp(bool force) {
   waitForNext = millis() + (30 * 60 * 1000);  // 30 minuten interval
 
   // We now create a URI for the request
-  String url = "/api/json-data-10min.php?key=bb83641a38&locatie=Baarn";
+  String url = "/api/json-data-10min.php?locatie=Baarn&key="+settingWeerLiveKey;
 
   _dThis = true;
-  Debug("Requesting URL: ");
-  Debugln(url);
+  Debugf("Requesting URL: [http://%s%s]\r\n", host, url.c_str());
   
-  if (!client.connect(host, httpPort)) {
+  if (!weerliveClient.connect(host, httpPort)) {
     _dThis = true;
     Debugln("connection failed");
     return -999.9;
   }
 
   // This will send the request to the server
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+  weerliveClient.print(String("GET ") + url + " HTTP/1.1\r\n" +
                "Host: " + host + "\r\n" + 
                "Connection: close\r\n\r\n");
   delay(10);
@@ -45,11 +46,14 @@ float getOutsideTemp(bool force) {
   jsonString = "";
   //Debugln("Respond:");
   maxWait = millis() + 5000;  // max response time is 5 seconds
-  while (maxWait > millis()) {
+  while (maxWait > millis()) 
+  {
     yield();
-    while(client.available()){
-      String line = client.readStringUntil('\r');
-      //TelnetStream.print(line);
+    while(weerliveClient.available())
+    {
+      String line = weerliveClient.readStringUntil('\r');
+      _dThis = true;
+      //Debugln(line);
       jsonString += line;
       maxWait = 0;
     }
@@ -57,9 +61,11 @@ float getOutsideTemp(bool force) {
   if (jsonString.length() < 100) {   // timed out!
     return -999.9;
   }
-
+  _dThis = true;
+  Debugln(jsonString);
   startPos   = jsonString.indexOf("\"temp\": ") + 9;
-  //Debugf("\"temp\": is on position [%d]\n", startPos);
+  _dThis = true;
+  Debugf("[\"temp\":] is on position [%d]\n", startPos);
   tempString = jsonString.substring(startPos);
   jsonString = tempString;
   endPos     = jsonString.indexOf("\",");
@@ -72,3 +78,6 @@ float getOutsideTemp(bool force) {
   return tempString.toFloat();
   
 } // getOutsideTemp()
+
+
+/* eof */

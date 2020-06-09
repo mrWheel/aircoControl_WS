@@ -86,6 +86,7 @@ void showStatus() {
   Debug("]\r\n   Firmware Update server [");  Debug( settingUpdateURL );
   Debug("]\r\n                     See: [https://www.grc.com/fingerprints.htm");
   Debug("]\r\n Update Server Fingeprint [");  Debug( settingFingerPrint ); 
+  Debug("]\r\n             WeerLive Key [");  Debug( settingWeerLiveKey ); 
   
   Debug("]\r\n          Switch Off Puls [");  Debug( settingPulsOff ); 
   Debug("]\r\n         Switch Cool puls [");  Debug( settingPulsCool ); 

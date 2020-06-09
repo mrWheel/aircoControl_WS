@@ -1,7 +1,7 @@
 /*
- * aircoControl_WS v0.3.0
+ * aircoControl_WS 
 */
-#define _FW_VERSION "v0.3.0 WS (24-01-2019)"
+#define _FW_VERSION "v0.4.0 WS (09-06-2020)"
 /* 
 
     Arduino-IDE settings for ESP-12E:
@@ -20,6 +20,8 @@
     - Upload Speed: "115200"
     - Erase Flash: "Only Sketch"
     - Port: "aircoControl at <-- IP address -->"
+
+    Arduino ESP8266 core v2.7.1
 */
 
 #include <IRremoteESP8266.h>    // v2.5.2
@@ -27,14 +29,12 @@
 #include "rawDataIR.h"  // raw date from IRrecvDumpV2.ino
 #include <OneWire.h>
 #include <DallasTemperature.h>
-#include <TimeLib.h>  // https://github.com/PaulStoffregen/Time
+#include <ezTime.h>   // https://github.com/ropg/ezTime
 
 #include "Debug.h"
 #define _HOSTNAME     "aircoControl"
 #include "networkStuff.h"
 
-#define _SSID         "yourSSID"         // WiFi SSID
-#define _PASSWORD     "SSIDpasswd"       // WiFi PASSWORD
 #define ONE_WIRE_PIN  2                 // GPIO02 - GPIO pin waar DS18B20 op aangesloten is
 #define IR_LED        4                 // ESP8266 GPIO pin to use. Recommended: 4 (D2).
 #define LEDPIN        5                 // what digital pin we're connected to
@@ -65,7 +65,8 @@ char     *dummyspace = {"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"};
 float     tn0, tn1, outsiteTemp, outTemp, inTemp0 = 0.0, inTemp1 = 0.0;
 float     increment0 = 0.1, increment1 = 0.14;
 bool      hasDS18B20sensor, ledOnState; //--, isConnected;
-uint32_t  nextSecond, nextStateSend, nextPollTime, nextPlotTime, ledOnTime, ledOffTime, aircoSwitchOffTime;
+uint32_t  nextSecond, nextStateSend, nextPollTime, nextPlotTime;
+uint32_t  ledOnTime, ledOffTime, aircoSwitchOffTime;
 uint32_t  ledOnAt, ledOffAt, aircoOnAt, aircoOffAt; // timestamps
 uint64_t  upTimeSeconds;
 uint8_t   last21Hour, lastSaveHour; // if this is not the same as "hour()" -> save data
@@ -82,7 +83,7 @@ int8_t    clientActiveTab;
 float     clientInTemp0, clientInTemp1, clientOutTemp;
 int16_t   clientCoolTemp, clientHeatTemp, clientDemping;
 uint32_t  clientPollTime, clientPlotTime;
-String    clientUpdateURL, clientFingerPrint;
+String    clientUpdateURL, clientFingerPrint, clientWeerLiveKey;
 String    clientPulsOff, clientPulsCool, clientPulsCoolMax, clientPulsHeat, clientPulsHeatMax;
 uint16_t  clientDataPointer;
 char      clientState = '-';
@@ -97,6 +98,9 @@ int8_t    settingDemping     = 5;
 String    settingUpdateURL   = "https://willem.aandewiel.nl/wp-content/uploads/2019/01/aircoControl.bin";
           // find out fingerprint: https://www.grc.com/fingerprints.htm
 String    settingFingerPrint = "C2:10:43:58:12:74:4A:31:A6:19:E3:32:81:92:30:C3:40:C9:50:D7";
+String    settingWeerLiveKey = "";
+
+Timezone  CET;
 
 const int         timeZone = 1;       // Central European (Winter) Time
 unsigned int      localPort = 8888;   // local port to listen for UDP packets
@@ -259,7 +263,8 @@ void getAircoState() {
 
   sprintf(dateTime, "%02d-%02d-%04d %02d:%02d", day(dt), month(dt), year(dt), hour(dt), minute(dt));
 
-  if (aircoState != clientState) {
+  if (aircoState != clientState) 
+  {
     clientState = aircoState;
     sprintf(wsSend, "aircoStatus, %c", clientState);
     _dThis = true;
@@ -267,7 +272,8 @@ void getAircoState() {
     webSocket.broadcastTXT(wsSend);
   }   
 
-  if (inTemp1 != clientInTemp1) {
+  if (inTemp1 != clientInTemp1) 
+  {
     clientInTemp1 = inTemp1;
     sprintf(wsSend, "inTemp1, %.1f", clientInTemp1);
     _dThis = true;
@@ -275,77 +281,96 @@ void getAircoState() {
     webSocket.broadcastTXT(wsSend);
   }   
 
-  if (outTemp != clientOutTemp) {
+  if (outTemp != clientOutTemp) 
+  {
     clientOutTemp = outTemp;
     sprintf(wsSend, "outTemp, %.1f", clientOutTemp);
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }   
-  if (settingCoolThreshold != clientCoolTemp) {
+  if (settingCoolThreshold != clientCoolTemp) 
+  {
     clientCoolTemp = settingCoolThreshold;
     sprintf(wsSend, "aircoCoolTemp, %d", clientCoolTemp);
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }
-  if (settingHeatThreshold != clientHeatTemp) {
+  if (settingHeatThreshold != clientHeatTemp) 
+  {
     clientHeatTemp = settingHeatThreshold;
     sprintf(wsSend, "aircoHeatTemp, %d", clientHeatTemp);
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }
-  if (settingDemping != clientDemping) {
+  if (settingDemping != clientDemping) 
+  {
     clientDemping = settingDemping;
     sprintf(wsSend, "aircoDemping, %d", clientDemping);
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }
-  if (dataPointer != clientDataPointer) {
+  if (dataPointer != clientDataPointer) 
+  {
     clientDataPointer = dataPointer;
     sprintf(wsSend, "aircoDataPoints, %d", clientDataPointer);
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }
-  if (nextPlotTime != clientPlotTime) {
+  if (nextPlotTime != clientPlotTime) 
+  {
     clientPlotTime = nextPlotTime;
     sprintf(wsSend, "aircoNextPlot, %s", String(((clientPlotTime - millis()) + 1) / 1000).c_str());
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }
-  if (settingUpdateURL != clientUpdateURL) {
+  if (settingUpdateURL != clientUpdateURL) 
+  {
     clientUpdateURL = settingUpdateURL;
     sprintf(wsSend, "setUpdateURL, %s", clientUpdateURL.c_str());
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }
-  if (settingFingerPrint != clientFingerPrint) {
+  if (settingFingerPrint != clientFingerPrint) 
+  {
     clientFingerPrint = settingFingerPrint;
     sprintf(wsSend, "setFingerPrint, %s", clientFingerPrint.c_str());
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }
-  if (settingPulsOff != clientPulsOff) {
+  if (settingWeerLiveKey != clientWeerLiveKey) 
+  {
+    clientWeerLiveKey = settingWeerLiveKey;
+    sprintf(wsSend, "setWeerLiveKey, %s", clientWeerLiveKey.c_str());
+    _dThis = true;
+    Debugf("websocket.send(%s)\n", wsSend);
+    webSocket.broadcastTXT(wsSend);
+  }
+  if (settingPulsOff != clientPulsOff) 
+  {
     clientPulsOff = settingPulsOff;
     sprintf(wsSend, "setPulsOff, %s", clientPulsOff.c_str());
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }
-  if (settingPulsCool != clientPulsCool) {
+  if (settingPulsCool != clientPulsCool) 
+  {
     clientPulsCool = settingPulsCool;
     sprintf(wsSend, "setPulsCool, %s", clientPulsCool.c_str());
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }
-  if (settingPulsCoolMax != clientPulsCoolMax) {
+  if (settingPulsCoolMax != clientPulsCoolMax) 
+  {
     clientPulsCoolMax = settingPulsCoolMax;
     sprintf(wsSend, "setPulsCoolMax, %s", clientPulsCoolMax.c_str());
     _dThis = true;
@@ -359,14 +384,16 @@ void getAircoState() {
     webSocket.broadcastTXT(wsSend);
 */
   }
-  if (settingPulsHeat != clientPulsHeat) {
+  if (settingPulsHeat != clientPulsHeat) 
+  {
     clientPulsHeat = settingPulsHeat;
     sprintf(wsSend, "setPulsHeat, %s", clientPulsHeat.c_str());
     _dThis = true;
     Debugf("websocket.send(%s)\n", wsSend);
     webSocket.broadcastTXT(wsSend);
   }
-  if (settingPulsHeatMax != clientPulsHeatMax) {
+  if (settingPulsHeatMax != clientPulsHeatMax) 
+  {
     clientPulsHeatMax = settingPulsHeatMax;
     sprintf(wsSend, "setPulsHeatMax, %s", clientPulsHeatMax.c_str());
     _dThis = true;
@@ -374,7 +401,8 @@ void getAircoState() {
     webSocket.broadcastTXT(wsSend);
   }
   
-  if (firstTime) {
+  if (firstTime) 
+  {
     firstTime = false;
     sprintf(wsSend, "upTime, %s", uptime().c_str());
     _dThis = true;
@@ -397,7 +425,8 @@ void getAircoState() {
 
 
 //=======================================================================
-void sendTableHistory() {
+void sendTableHistory() 
+{
   float     prevTemp, temp = 0;
   String    jsonTimestamp, jsonInTemp0, sKomma;
   uint32_t  dt;
@@ -417,7 +446,8 @@ void sendTableHistory() {
   dataStore[dataPointer].insideTemp0  = getInsideTemp(0);
   dataStore[dataPointer].insideTemp1  = getInsideTemp(1);
   
-  for ( int16_t r = (dataPointer - 0) ; ((r > 0) && (countHours <= 10)) ; r-- ) {
+  for ( int16_t r = (dataPointer - 0) ; ((r > 0) && (countHours <= 10)) ; r-- ) 
+  {
     dt = dataStore[r].timestamp + (timeZone * SECS_PER_HOUR);
     sprintf(dateTime, "\"%02d-%02d-%04d %02d:%02d\"", day(dt), month(dt), year(dt), hour(dt),minute(dt));
     if ((savHour == hour(dt)) && (r < (dataPointer - 0))) continue;
@@ -443,7 +473,8 @@ void sendTableHistory() {
 
 
 //=======================================================================
-void sendHistory() {  
+void sendHistory() 
+{  
   static bool firstTime;
   String    jsonString, jsonTimestamp, jsonOutTemp, jsonInTemp0, jsonInTemp1, sKomma;
   uint16_t  waitCount = 0;  
@@ -452,12 +483,14 @@ void sendHistory() {
   _dThis = true;
   Debugf("sendHistory(): FreeHeap @start [%d], dataPointer is [%ld]\n", ESP.getFreeHeap(), dataPointer);
 
-  if (newTab) {
+  if (newTab) 
+  {
     newTab    = false;
     firstTime = true;
   }
 
-  if (clientActiveTab != TAB_GRAFIEK && clientActiveTab != TAB_HISTORIE) {
+  if (clientActiveTab != TAB_GRAFIEK && clientActiveTab != TAB_HISTORIE) 
+  {
     return;
   }
 
@@ -472,7 +505,8 @@ void sendHistory() {
 
   if (dataPointer > 180) startP = dataPointer - 180;
   else                   startP = 0;
-  for ( int16_t r = startP ; r < dataPointer ; r++ ) {
+  for ( int16_t r = startP ; r < dataPointer ; r++ ) 
+  {
     jsonTimestamp   +=  sKomma + String(dataStore[r].timestamp);
     jsonOutTemp     +=  sKomma + String(dataStore[r].outsideTemp, 1);
     jsonInTemp0     +=  sKomma + String(dataStore[r].insideTemp0, 1);
@@ -488,7 +522,8 @@ void sendHistory() {
   jsonInTemp1     += "]";
 //Debugln(jsonInTemp1);
 
-  if ((ESP.getFreeHeap() < 3288) && (waitCount < 100)) {
+  if ((ESP.getFreeHeap() < 3288) && (waitCount < 100)) 
+  {
     _dThis = true;
     Debugf("Wait for more freeHeap (is now %ld bytes)\n", ESP.getFreeHeap());
     delay(100);
@@ -538,8 +573,9 @@ void displayHistory(String displayText, int16_t fromPoint = 0, int16_t toPoint =
   displayTo    = toPoint + 1;
   while (displayTo >= dataPointer) { displayTo--; }
 
-  //for ( int r = 0; r < dataPointer ; r++ ) {
-  for ( int16_t r = displayFrom; r <= displayTo ; r++ ) {
+  //for ( int r = 0; r < dataPointer ; r++ ) 
+  for ( int16_t r = displayFrom; r <= displayTo ; r++ ) 
+  {
     if (r == fromPoint)     indPoint = '@';
     else if (r == toPoint)  indPoint = '#';
     else                    indPoint = ' ';
@@ -561,7 +597,8 @@ void displayHistory(String displayText, int16_t fromPoint = 0, int16_t toPoint =
 
 
 //=======================================================================
-void buildHistory() {
+void buildHistory() 
+{
   uint32_t dt;
   char dateTime[30]; 
 
@@ -574,8 +611,8 @@ void buildHistory() {
   _dThis = false;
   dataPointer = 0;
 
-  for (int16_t r = (MAXDATA - 2); r >= 0 ; r-- ) {
-
+  for (int16_t r = (MAXDATA - 2); r >= 0 ; r-- ) 
+  {
     dataStore[r].timestamp = dt;
     dataStore[r].pointType = 'm';
 
@@ -606,7 +643,8 @@ void buildHistory() {
 
 
 //=======================================================================
-void deletePoints(int16_t fromPoint, int16_t toPoint) {
+void deletePoints(int16_t fromPoint, int16_t toPoint) 
+{
   int16_t fromList, toList;
   
   _dThis = true;
@@ -621,7 +659,8 @@ void deletePoints(int16_t fromPoint, int16_t toPoint) {
   //DebugFlush();
 
   _dThis = true;
-  for (int16_t r=fromPoint; r < (MAXDATA - toPoint); r++) {
+  for (int16_t r=fromPoint; r < (MAXDATA - toPoint); r++) 
+  {
     Debugf("%d ", r); DebugFlush();
     dataStore[r] = dataStore[r+toPoint];
   }
@@ -650,7 +689,8 @@ void deletePoints(int16_t fromPoint, int16_t toPoint) {
 
 
 //=======================================================================
-void compressHistory2Hours() {
+void compressHistory2Hours() 
+{
   uint32_t  dt;
   uint64_t  gemTimestamp;
   int16_t   countH, startCompr, endCompr;
@@ -659,11 +699,13 @@ void compressHistory2Hours() {
   
 
   startCompr = 0;
-  while (dataStore[startCompr].pointType == 'h' && startCompr < MAXDATA) {
+  while (dataStore[startCompr].pointType == 'h' && startCompr < MAXDATA) 
+  {
       startCompr++;
   }
-//if (startCompr > 48) {  // maximaal 2 dagen op uur-basis (14-01-2019)
-  if (startCompr > 96) {  // maximaal 4 dag op uur-basis
+//if (startCompr > 48)    // maximaal 2 dagen op uur-basis (14-01-2019)
+  if (startCompr > 96)    // maximaal 4 dag op uur-basis
+  {
     _dThis = true;
     Debugln("delete hours 0 to 6 ...");
     deletePoints(0, 6);
@@ -671,7 +713,8 @@ void compressHistory2Hours() {
 
   startCompr = 0;
   // set startpoint to first non-"h"!
-  while (dataStore[startCompr].pointType == 'h' && startCompr < MAXDATA) {
+  while (dataStore[startCompr].pointType == 'h' && startCompr < MAXDATA) 
+  {
       startCompr++;
   }
   // startCompr is the first NON-"h" dataPoint!
@@ -684,8 +727,10 @@ void compressHistory2Hours() {
   savDay       = day(dt);
   savHour      = hour(dt);
 
-  for (endCompr = startCompr; endCompr < dataPointer; endCompr++) {
-    if (day(dataStore[endCompr].timestamp) != savDay || hour(dataStore[endCompr].timestamp) != savHour) {
+  for (endCompr = startCompr; endCompr < dataPointer; endCompr++) 
+  {
+    if (day(dataStore[endCompr].timestamp) != savDay || hour(dataStore[endCompr].timestamp) != savHour) 
+    {
       break;
     }
     gemTimestamp += dataStore[endCompr].timestamp;
@@ -715,7 +760,8 @@ void compressHistory2Hours() {
   dataStore[startCompr].insideTemp1 = gemInTemp1  / (1 + (endCompr - startCompr));
   dataStore[startCompr].pointType   = 'h';
 
-  for (int16_t r = (startCompr + 1); (r < (dataPointer - (endCompr - startCompr))) && (r < (MAXDATA - (endCompr - startCompr))); r++) {
+  for (int16_t r = (startCompr + 1); (r < (dataPointer - (endCompr - startCompr))) && (r < (MAXDATA - (endCompr - startCompr))); r++) 
+  {
     _dThis = true;
     Debugf("dataStore[%d] := dataStore[%d]\n", r, (r + endCompr - startCompr));
     dataStore[r] = dataStore[(r + endCompr - startCompr)];
@@ -725,7 +771,8 @@ void compressHistory2Hours() {
   dataPointer -= (endCompr - startCompr);
   Debugf("to [%d]\n", dataPointer);
 
-  for (int16_t r = dataPointer; r < MAXDATA; r++) {
+  for (int16_t r = dataPointer; r < MAXDATA; r++) 
+  {
     dataStore[r].timestamp    = 0;
     dataStore[r].pointType    = '-';
     dataStore[r].outsideTemp  = 0;
@@ -736,20 +783,25 @@ void compressHistory2Hours() {
 } // compressHistory2Hours()
 
 //=======================================================================
-void addPointToHistory(){
+void addPointToHistory()
+{
   uint32_t  dt, tps = now() - (timeZone * SECS_PER_HOUR);  // 1 uur eraf;
   float     tempR, tempR2;
   uint8_t   savDay, countHours;
   char      dateTime[20];
 
-  if (millis() > nextPlotTime) {
+  if (millis() > nextPlotTime) 
+  {
     if (dataPointer < 25) {  // 50
       nextPlotTime = millis() + ((PLOTINTERVAL * 100) - (second() * 1000));  // 1 minuut
-    } else if (dataPointer < 50) {
+    } else if (dataPointer < 50) 
+    {
       nextPlotTime = millis() + ((PLOTINTERVAL * 200) - (second() * 1000));  // 2 minuten
-    } else if (minute()%10 != 0) {
+    } else if (minute()%10 != 0) 
+    {
       int16_t secondsToGo = (((10 - (minute()%10)) * 60) - second() + 2);
-      if (secondsToGo <= 1) {
+      if (secondsToGo <= 1) 
+      {
         //Debugf("secondsToGo[%d]\n", secondsToGo);
         secondsToGo = 30;
       }
@@ -759,33 +811,41 @@ void addPointToHistory(){
                                                                     , secondsToGo
            );
       nextPlotTime = millis() + (secondsToGo * 1000);  // next plot on the 10 minute marks
-    } else {
+    } else 
+    {
       nextPlotTime = millis() + ((PLOTINTERVAL - second()) * 1000);  // 10 minuten interval
     }
-  } else {
+  } else 
+  {
     _dThis = true;
     Debugf("Next plot in [%d] seconden ==> Skip!\n", ((nextPlotTime - millis()) / 1000));
     return;
   }
-  if (!hasDS18B20sensor) {
+  if (!hasDS18B20sensor) 
+  {
     nextPlotTime = millis() + 90000;  // 1,5 minute interval
   }
   _dThis = true;
   Debugf("%02d:%02d:%02d (timestamp: %d)\n", hour(), minute(), second(), tps);
 
-  if ( tps > 1000 ) {
+  if ( tps > 1000 ) 
+  {
     tps = (int)(tps / 100) * 100; // skip seconden
-    if ( dataPointer >= MAXDATA ) {
+    if ( dataPointer >= MAXDATA ) 
+    {
       //if (dataStore[23].pointType == 'h') {         // this was
-      if (dataStore[MAXDATA - 48].pointType == 'h') { // this is as of 18-01-2019
+      if (dataStore[MAXDATA - 48].pointType == 'h')   // this is as of 18-01-2019
+      {
         deletePoints(0, 6); // delete first 6 hours
-      } else {
+      } else 
+      {
         deletePoints(0, 1); // just delete the oldest point 
       }
       savDay = day(dataStore[0].timestamp);
       countHours = 1;
       //---- compress 3 hours ----
-      while(savDay == day(dataStore[countHours].timestamp) && (countHours <= 3)) {
+      while(savDay == day(dataStore[countHours].timestamp) && (countHours <= 3)) 
+      {
         compressHistory2Hours();
         countHours++;
         dt = dataStore[countHours].timestamp; 
@@ -801,9 +861,11 @@ void addPointToHistory(){
                                         , String(dataStore[countHours].insideTemp1, 1).c_str());
         }
     }
-    if (dataPointer < MAXDATA) {
+    if (dataPointer < MAXDATA) 
+    {
       float newOutTemp = getOutsideTemp(false);
-      if (newOutTemp < -999.0)  {
+      if (newOutTemp < -999.0)  
+      {
         _dThis = true;
         Debugln("Error reading outside Temperature!");
       } else {
@@ -821,7 +883,8 @@ void addPointToHistory(){
       dataStore[dataPointer].insideTemp0  = inTemp0;
       dataStore[dataPointer].insideTemp1  = inTemp1;
       dataPointer++;
-    } else {
+    } else 
+    {
       Debugf("Some error occured! dataPointer[%d] > maxdata[%d]\n", (dataPointer - 1), MAXDATA);
     }
     //char tc[20];    dtostrf(t, 4, 1, tc);
@@ -836,14 +899,16 @@ void addPointToHistory(){
 
 
 //===========================================================================================
-void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) 
 //===========================================================================================
+{
     String  text = String((char *) &payload[0]);
     char *  textC = (char *) &payload[0];
     String  pOut[5], pDev[5], pVal[5], words[10], jsonString;
     int8_t  deviceNr;
 
-    switch(type) {
+    switch(type) 
+    {
         case WStype_DISCONNECTED:
             _dThis = true;
             Debugf("[%u] Disconnected!\n", num);
@@ -852,7 +917,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
         case WStype_CONNECTED:
             {
                 IPAddress ip = webSocket.remoteIP(num);
-                if (!isConnected) {
+                if (!isConnected) 
+                {
                   _dThis = true;
                   Debugf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
                   isConnected = true;
@@ -869,7 +935,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
             splitString(text, ':', words, 10);
             // send data to all connected clients
             // webSocket.broadcastTXT("message here");
-            if (text.indexOf("tabControl") > -1) {
+            if (text.indexOf("tabControl") > -1) 
+            {
               clientActiveTab   = TAB_CONTROL;
               newTab            = true;
               clientInTemp0     = -99.99;
@@ -884,52 +951,71 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
               clientState       = '-';
               clientUpdateURL   = '-';
               clientFingerPrint = '-';
+              clientWeerLiveKey = '-';
               clientPulsOff     = '-';
               clientPulsCool    = '-';
               clientPulsCoolMax = '-';
               clientPulsHeat    = '-';
               clientPulsHeatMax = '-';
               
-            } else if (text.indexOf("tabGrafiek") > -1) {
+            } else if (text.indexOf("tabGrafiek") > -1) 
+            {
               clientActiveTab = TAB_GRAFIEK;
               newTab          = true;
               sendHistory();
               
-            } else if (text.indexOf("tabHistorie") > -1) {
+            } else if (text.indexOf("tabHistorie") > -1) 
+            {
               clientActiveTab = TAB_HISTORIE;
               newTab          = true;
               sendHistory();
               
             } 
                         
-            if (text.indexOf("setCoolTemp") > -1) {
+            if (text.indexOf("setCoolTemp") > -1) 
+            {
               settingCoolThreshold = words[1].toInt();
-            } else if (text.indexOf("setHeatTemp") > -1) {
+            } else if (text.indexOf("setHeatTemp") > -1) 
+            {
               settingHeatThreshold = words[1].toInt();
-            } else if (text.indexOf("setDemping") > -1) {
+            } else if (text.indexOf("setDemping") > -1) 
+            {
               settingDemping       = words[1].toInt();
-            } else if (text.indexOf("setUpdateURL") > -1) {
+            } else if (text.indexOf("setUpdateURL") > -1) 
+            {
               settingUpdateURL = text.substring(text.indexOf("http"));
               settingUpdateURL.trim();
-            } else if (text.indexOf("setFingerPrint") > -1) {
+            } else if (text.indexOf("setFingerPrint") > -1) 
+            {
               settingFingerPrint = text.substring(text.indexOf(":") + 1);
               settingFingerPrint.trim();
-            } else if (text.indexOf("setPulsOff") > -1) {
+            } else if (text.indexOf("setWeerLiveKey") > -1) 
+            {
+              settingWeerLiveKey = text.substring(text.indexOf(":") + 1);
+              settingWeerLiveKey.trim();
+            } else if (text.indexOf("setPulsOff") > -1) 
+            {
               settingPulsOff       = words[1];
-            } else if (text.indexOf("setPulsCool") > -1) {
+            } else if (text.indexOf("setPulsCool") > -1) 
+            {
               settingPulsCool      = words[1];
-            } else if (text.indexOf("setPulsCoolMax") > -1) {
+            } else if (text.indexOf("setPulsCoolMax") > -1) 
+            {
               settingPulsCoolMax   = words[1];
-            } else if (text.indexOf("setPulsHeat") > -1) {
+            } else if (text.indexOf("setPulsHeat") > -1) 
+            {
               settingPulsHeat      = words[1];
-            } else if (text.indexOf("setPulsHeatMax") > -1) {
+            } else if (text.indexOf("setPulsHeatMax") > -1) 
+            {
               settingPulsHeatMax    = words[1];
               
-            } else if (text.indexOf("saveSettings") > -1) {
+            } else if (text.indexOf("saveSettings") > -1) 
+            {
               writeSettings();
             }
                         
-            if (text.indexOf("getDevInfo") > -1) {
+            if (text.indexOf("getDevInfo") > -1) 
+            {
               jsonString  = "{";
               jsonString += "\"msgType\": \"devInfo\"";
               jsonString += ", \"devName\": \"" + String(_HOSTNAME) + " \"";
@@ -939,7 +1025,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
               _dThis = true;
               Debugf("websocket.send(%s)\n", jsonString.c_str());
               webSocket.broadcastTXT(jsonString);
-            } else if (text.startsWith("Button")) {
+            } else if (text.startsWith("Button")) 
+            {
               //splitString(text, ':', words, 10);
               _dThis = true;
               if (words[1] == "COOL")       updateAirco(1);
@@ -954,8 +1041,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
 
 
 //=======================================================================
-void setup() {
-  
+void setup() 
+{  
   Serial.begin ( 115200 );
   lastResetReason = ESP.getResetReason();
 
@@ -963,9 +1050,18 @@ void setup() {
   pinMode(LEDPIN, OUTPUT);
   digitalWrite(LEDPIN, HIGH);
 
-  setTime(dateTime2Epoch(__DATE__, __TIME__));
+  //setTime(dateTime2Epoch(__DATE__, __TIME__));
   startWiFi();
+    
+  //--- ezTime initialisation
+  setDebug(INFO);  
+  waitForSync(); 
+  CET.setLocation(F("Europe/Amsterdam"));
+  CET.setDefault(); 
   
+  Debugln("UTC time: "+ UTC.dateTime());
+  Debugln("CET time: "+ CET.dateTime());
+
   _dThis = true;
   Debugf("last Reset Reason [%s]\n", lastResetReason.c_str());
   _dThis = true;
@@ -973,7 +1069,8 @@ void setup() {
   startArduinoOTA(_HOSTNAME);
   startTelnet();
  
-  for (int f=0; f<10; f++) {
+  for (int f=0; f<10; f++) 
+  {
     delay(200);
     digitalWrite(LEDPIN, !digitalRead(LEDPIN));
   }
@@ -981,44 +1078,21 @@ void setup() {
 
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
-/*
-  _dThis = true;
-  Debugln("Starting UDP");
-  Udp.begin(localPort);
-  _dThis = true;
-  Debug("Local port: ");
-  Debugln(String(Udp.localPort()));
-*/
-  _dThis = true;
-  if (!startNTP()) {
-    _dThis = true;
-    Debugln("ERROR!!! No NTP server reached!\n");
-  }
-/*
-  int waitForTime = 3;
-  _dThis = true;
-  Debugf("externalNtpSync(): [%d]\n", externalNtpSync());
-  while (!externalNtpSync() && waitForTime > 0) {
-    _dThis = true;
-    Debugln("waiting for sync on NTP server ..");
-    DebugFlush();
-    digitalWrite(LEDPIN, !digitalRead(LEDPIN));
-    setSyncProvider(getNtpTime);
-    setSyncInterval(600);
-    _dThis = true;
-    Debugf("externalNtpSync(): [%d] from [%s]\n", externalNtpSync(), externalNtpIP().c_str());
-    waitForTime--;
-  }
-*/
+
   digitalWrite(LEDPIN, HIGH);
 
   _dThis = true;
-  if (!SPIFFS.begin()) {
+  if (!SPIFFS.begin()) 
+  {
     Debugln("SPIFFS Mount failed\n");           // Serious problem with SPIFFS 
-  } else { 
+  } else 
+  { 
     Debugln("SPIFFS Mount succesfull");
     loadHistory();
   }
+
+  // --- initialize -----
+  readSettings();
   
 //HttpServer.on("/tab_historie.json", sendTableHistory);
 //HttpServer.on("/tab_temp.json",     sendTabTemp);
@@ -1081,22 +1155,26 @@ void setup() {
   inTemp1 = getInsideTemp(1);
   
   _dThis = true;
-  if (!hasDS18B20sensor) {
+  if (!hasDS18B20sensor) 
+  {
     inTemp0  = 0;
     inTemp1  = 1;
     tn0      = 0;
     tn1      = 1;
     Debugln("setup(): no inside temperature sensors found!");
     Debugln("setup(): making up temperature data..\n");
-  } else {
+  } else 
+  {
     Debugln("setup(): has inside temperature sensor(s)");
     //inTemp0  = getInsideTemp(0);
     tn0     = inTemp0;
     tn1     = inTemp1;
   }
+  
   outTemp = getOutsideTemp(true);
 
-  for (int f=0; f<6; f++) {
+  for (int f=0; f<6; f++) 
+  {
     delay(500);
     digitalWrite(LEDPIN, !digitalRead(LEDPIN));
   }
@@ -1105,9 +1183,6 @@ void setup() {
   ledOnAt       = now();
   _dThis = true;
   Debugf("last Reset Reason [%s]\n", lastResetReason.c_str());
-
-  // --- initialize -----
-  readSettings();
   
   nextPollTime    = millis() + ((61 - second()) * 1000);
   nextPlotTime    = millis() + 30000;  // first plot after 30 seconds
@@ -1130,23 +1205,27 @@ void setup() {
 
 
 //=======================================================================
-void loop() {
+void loop() 
+{
   ArduinoOTA.handle();
   HttpServer.handleClient();
   webSocket.loop();
   handleLed();  
-  if (loopNTP()) {  // if time is not set .. no use in plotting
+  events(); // trigger ezTime update etc.
+//if (loopNTP()) {  // if time is not set .. no use in plotting
     handleSensor();
     handleAutonomous();
     handlePlotPoint();
-  }
+//}
   handleKeyInput(); // menu
 
-  if (millis() > nextSecond) {
+  if (millis() > nextSecond) 
+  {
     nextSecond += 1000;
     upTimeSeconds++;
   }
-  if (millis() > nextStateSend) {
+  if (millis() > nextStateSend) 
+  {
     nextStateSend += 2000;
     getAircoState();
   }

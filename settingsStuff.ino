@@ -28,6 +28,7 @@ void writeSettings() {
   file.print("aircoCoolMax      = ");  file.println(settingPulsCoolMax);
   file.print("aircoHeat         = ");  file.println(settingPulsHeat);
   file.print("aircoHeatMax      = ");  file.println(settingPulsHeatMax);
+  file.print("WeerLiveKey       = ");  file.println(settingWeerLiveKey);
 
   file.close();  
   
@@ -52,6 +53,7 @@ void readSettings() {
     settingDemping          = 5;
     settingUpdateURL   = "https://willem.aandewiel.nl/wp-content/uploads/2019/01/aircoControl.bin";
     settingFingerPrint = "C2:10:43:58:12:74:4A:31:A6:19:E3:32:81:92:30:C3:40:C9:50:D7";
+    settingWeerLiveKey = "";
     settingPulsOff     = "_rawOffData.puls";
     settingPulsCoolMax = "_Cool26Cauto.puls";
     settingPulsCool    = "_Cool26C3D.puls";
@@ -79,6 +81,7 @@ void readSettings() {
     if (words[0] == "dempingsfactor")     settingDemping       = words[1].toInt();  
     if (words[0] == "updateurl")          settingUpdateURL     = words[1];  
     if (words[0] == "updatefingerprint")  settingFingerPrint   = words[1];  
+    if (words[0] == "weerlivekey")        settingWeerLiveKey   = words[1];  
     if (words[0] == "aircooff")           settingPulsOff       = words[1];  
     if (words[0] == "aircocool")          settingPulsCool      = words[1];  
     if (words[0] == "aircocoolmax")       settingPulsCoolMax   = words[1];  
@@ -93,6 +96,7 @@ void readSettings() {
   _dThis = true; Debugf("Dempings Factor  : %d\n", settingDemping);
   _dThis = true; Debugf("updateURL        : %s\n", settingUpdateURL.c_str());
   _dThis = true; Debugf("FingerPrint      : %s\n", settingFingerPrint.c_str());
+  _dThis = true; Debugf("Weerlive.nl key  : %s\n", settingWeerLiveKey.c_str());
   _dThis = true; Debugf("Puls Off         : %s\n", settingPulsOff.c_str());
   _dThis = true; Debugf("Puls Cool        : %s\n", settingPulsCool.c_str());
   _dThis = true; Debugf("Puls Cool Max    : %s\n", settingPulsCoolMax.c_str());

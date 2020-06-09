@@ -1,4 +1,5 @@
 /*-------- NTP code ----------*/
+#ifdef HUTSEFLUTS
 
 // NTP Servers:
 static const char ntpServerName0[] = "nl.pool.ntp.org";
@@ -230,3 +231,7 @@ time_t dateTime2Epoch(char const *date, char const *time) {
     return makeTime(t);
     
 } // dateTime2Epoch()
+
+#endif
+
+/* eof */

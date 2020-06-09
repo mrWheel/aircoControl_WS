@@ -12,7 +12,8 @@
 #include <ESP8266WiFi.h>        // version 1.0.0  - part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <ESP8266WebServer.h>   // Version 1.0.0  - part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <ESP8266HTTPUpdateServer.h>
-//#include <DNSServer.h>        //                - part of ESP8266 Core https://github.com/esp8266/Arduino
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
 #include <WiFiUdp.h>            //                - part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <ESP8266mDNS.h>        //                - part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <WiFiManager.h>        // version 0.14.0 - https://github.com/tzapu/WiFiManager

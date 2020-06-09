@@ -135,17 +135,22 @@ void loadHistory(String dataFile) {
   }
 
   File file = SPIFFS.open(dataFile, "r");
-  if (!file) {
+  if (!file) 
+  {
     _dThis = true;
     Debugf("No dataStore [%s] Exist\n", dataFile.c_str());
-  } else {
+  } else 
+  {
     size_t size = file.size();
-    if ( size == 0 ) {
+    if ( size == 0 ) 
+    {
       _dThis = true;
       Debugf("dataStore [%s] empty !\n", dataFile.c_str());
-    } else {
+    } else 
+    {
       dataPointer = 0;
-      while (file.available() && dataPointer < MAXDATA) {
+      while (file.available() && dataPointer < MAXDATA) 
+      {
         yield();
         s         = file.readStringUntil(';');
         timeStamp = s.toInt();
@@ -167,7 +172,7 @@ void loadHistory(String dataFile) {
             break;
           }
         }
-        if (externalNtpSync() && (timeStamp < now())) {
+        //if (externalNtpSync() && (timeStamp < now())) {
           dataStore[dataPointer].timestamp    = timeStamp;
           dataStore[dataPointer].pointType    = pointType;
           if (   (outTemp > -50 && outTemp < 60) 
@@ -177,13 +182,13 @@ void loadHistory(String dataFile) {
             dataStore[dataPointer].insideTemp0  = inTemp0;
             dataStore[dataPointer].insideTemp1  = inTemp1;
             dataPointer++;
-          } else {
-            _dThis = true;
-            Debugf("read invalid data @[%d] .. SKIP!\n", dataPointer);
-          }
-        } else {
-          _dThis = true;
-          Debugln("read invalid timeStamp .. SKIP!");
+        //  } else {
+        //    _dThis = true;
+        //    Debugf("read invalid data @[%d] .. SKIP!\n", dataPointer);
+        //  }
+        //} else {
+        //  _dThis = true;
+        //  Debugln("read invalid timeStamp .. SKIP!");
         }
       } // while records ..
       _dThis = true;
@@ -191,12 +196,12 @@ void loadHistory(String dataFile) {
     }
     file.close();
   }
-  if (!externalNtpSync()) {
-    setTime(dataStore[(dataPointer - 1)].timestamp);
-    _dThis = true;
-    Debugf("last data point time [%04d-%02d-%02d @ %02d:%02d:%02d]\n", year(), month(), day(), hour(), minute(), second());
-    DebugFlush();
-  }
+//  if (!externalNtpSync()) {
+//    setTime(dataStore[(dataPointer - 1)].timestamp);
+//    _dThis = true;
+//    Debugf("last data point time [%04d-%02d-%02d @ %02d:%02d:%02d]\n", year(), month(), day(), hour(), minute(), second());
+//    DebugFlush();
+//  }
 
 } // loadHistory()
 
@@ -245,8 +250,8 @@ void saveHistory(bool force) {
     } else {
       _dThis = true;
       Debugf("timestamp error entry[%d]/[%d] => prev[%d], new[%d]", prevDataPoint, r
-                                                                    , prevTimestamp 
-                                                                    , dataStore[r].timestamp
+                                                                  , prevTimestamp 
+                                                                  , dataStore[r].timestamp
            );
     }
   }
